@@ -142,10 +142,13 @@ int main() {
     if (strcmp(head->argstr, "exit") == 0) {
       exit(0);
     } else if (strcmp(head->argstr, "cd") == 0) {
-      if (head->next->argstr == NULL) {
-        head->next->argstr = getenv("HOME");
+      if (head->next == NULL) {
+        char *home = getenv("HOME");
+        if (chdir(home) != 0) {
+          printf("cd: %s: No such file or directory\n", home);
+        }
       }
-      if (strchr(head->next->argstr, '~') != NULL) {
+      else if (strchr(head->next->argstr, '~') != NULL) {
         char *home = getenv("HOME");
         char *new_arg = malloc(strlen(home) + strlen(head->argstr) + 1);
         if (new_arg == NULL) {
