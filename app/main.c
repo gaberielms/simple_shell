@@ -139,13 +139,13 @@ int main() {
       }
     }
     // BUILTIN COMMANDS
-    if (strcmp(input, "exit") == 0) {
+    if (strcmp(head->argstr, "exit") == 0) {
       exit(0);
-    } else if (strcmp(input, "cd") == 0) {
-      if (head->argstr == NULL) {
-        head->argstr = getenv("HOME");
+    } else if (strcmp(head->argstr, "cd") == 0) {
+      if (head->next->argstr == NULL) {
+        head->next->argstr = getenv("HOME");
       }
-      if (strchr(head->argstr, '~') != NULL) {
+      if (strchr(head->next->argstr, '~') != NULL) {
         char *home = getenv("HOME");
         char *new_arg = malloc(strlen(home) + strlen(head->argstr) + 1);
         if (new_arg == NULL) {
@@ -154,16 +154,16 @@ int main() {
           exit(1);
         }
         strcpy(new_arg, home);
-        strcat(new_arg, head->argstr + 1);
+        strcat(new_arg, head->next->argstr + 1);
         if (chdir(new_arg) != 0) {
           printf("cd: %s: No such file or directory\n", new_arg);
         }
         free(new_arg);
-      } else if (chdir(head->argstr) != 0) {
+      } else if (chdir(head->next->argstr) != 0) {
         printf("cd: %s: No such file or directory\n", head->argstr);
       }
-    } else if (strcmp(input, "echo") == 0) {
-      current = head;
+    } else if (strcmp(head->argstr, "echo") == 0) {
+      current = head->next;
       while (current != NULL) {
         printf("%s", current->argstr);
         current = current->next;
@@ -172,15 +172,15 @@ int main() {
         }
       }
       printf("\n");
-    } else if (strcmp(input, "pwd") == 0) {
+    } else if (strcmp(head->argstr, "pwd") == 0) {
       char cwd[100];
       if (getcwd(cwd, sizeof(cwd)) != NULL) {
         printf("%s\n", cwd);
       } else {
         printf("Failed to get current working directory\n");
       }
-    } else if (strcmp(input, "type") == 0) {
-      char *curarg = head->argstr;
+    } else if (strcmp(head->argstr, "type") == 0) {
+      char *curarg = head->next->argstr;
       char *command = find_command(curarg);
       if (strcmp(curarg, "cd") == 0) {
         printf("cd is a shell builtin\n");
