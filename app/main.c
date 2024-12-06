@@ -163,7 +163,7 @@ int main() {
         }
         free(new_arg);
       } else if (chdir(head->next->argstr) != 0) {
-        printf("cd: %s: No such file or directory\n", head->argstr);
+        printf("cd: %s: No such file or directory\n", head->next->argstr);
       }
     } else if (strcmp(head->argstr, "echo") == 0) {
       current = head->next;
