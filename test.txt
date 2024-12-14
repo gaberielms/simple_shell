@@ -1,0 +1,7 @@
+.
+..
+.git
+README.md
+app
+run.sh
+test.txt
