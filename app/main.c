@@ -21,18 +21,43 @@ void free_args(arg *head) {
   }
 }
 
+arg *build_arg(arg *head) {
+  arg *new_arg = malloc(sizeof(arg));
+  if (new_arg == NULL) {
+    fprintf(stderr, "Failed to allocate memory for new_arg\n");
+    free_args(head);
+    exit(1);
+  }
+  new_arg->argstr = NULL;
+  new_arg->next = NULL;
+  new_arg->is_quote = 0;
+  return new_arg;
+}
+
+void print_args(arg *head) {
+  arg *current = head;
+  int i = 0;
+  printf("[\n");
+  while (current != NULL) {
+    printf("  %d: %s\n", i++, current->argstr);
+    current = current->next;
+  }
+  printf("]\n");
+}
+
 char *find_command(char *command) {
   char *path = getenv("PATH");
   char *path_copy = strdup(path);
   if (path_copy == NULL) {
-    printf("Failed to allocate memory for path_copy\n");
+    fprintf(stderr, "Failed to allocate memory for path_copy\n");
     return NULL;
   }
   char *dir = strtok(path_copy, ":");
   while (dir != NULL) {
     char *full_path = malloc(strlen(dir) + strlen(command) + 2);
     if (full_path == NULL) {
-      printf("Failed to allocate memory for full_path\n");
+      fprintf(stderr, "Failed to allocate memory for full_path\n");
+      free(path_copy);
       return NULL;
     }    
     strcpy(full_path, dir);
@@ -49,97 +74,94 @@ char *find_command(char *command) {
   return NULL;
 }
 
+void build_args(char *args, arg *head) {
+  arg *current = head;
+  // Skip leading whitespace
+  while (*args == ' ') {
+    args++;
+  }
+  // Build arg linked list
+  while (*args != '\0') {
+    char buffer[1024];
+    int len = 0;
+    int in_quotes = 0;
+    int in_double_quotes = 0;
+    // Collect the argument characters
+    while (*args != '\0' && (*args != ' ' || in_double_quotes || in_quotes)) {
+      if (*args == '"' && !in_double_quotes && !in_quotes) {
+        in_double_quotes = 1;
+        args++;
+      } else if (*args == '\'' && !in_quotes && !in_double_quotes) {
+        in_quotes = 1;
+        args++;
+      } else if (*args == '"' && in_double_quotes) {
+        in_double_quotes = 0;
+        args++;
+      } else if (*args == '\'' && in_quotes) {
+        in_quotes = 0;
+        args++;
+      } else if (*args == '\\' && in_double_quotes) {
+        args++;
+        if (*args == '\0') {
+          break;
+        }
+        if (*args == '\\' || *args == '"' || *args == '$' || *args == '\n') {
+          buffer[len++] = *args++;
+        } else {
+          buffer[len++] = '\\';
+          buffer[len++] = *args++;
+        }
+      } else if (*args == '\\' && (!in_double_quotes && !in_quotes)) {
+        args++;
+        if (*args == '\0') {
+          break;
+        }
+        buffer[len++] = *args++;
+      } else {
+        buffer[len++] = *args++;
+      }
+    }
+    buffer[len] = '\0';
+    // Assign the argument string
+    current->argstr = strdup(buffer);
+    if (current->argstr == NULL) {
+      fprintf(stderr, "Failed to allocate memory for argstr\n");
+      free_args(head);
+      exit(1);
+    }
+    current->is_quote = in_quotes || in_double_quotes;
+    in_double_quotes = 0;
+    in_quotes = 0;
+    // Skip trailing whitespace
+    while (*args == ' ') {
+      args++;
+    }
+    // Build next arg
+    if (*args != '\0') {
+      current->next = build_arg(head);
+      current = current->next;
+    }
+  }
+}
+
 int main() {
   while (1) {
     printf("$ ");
     fflush(stdout);
     // Wait for user input
-    char input[100];
-    fgets(input, 100, stdin);
+    char input[1024];
+    if (fgets(input, 1024, stdin) == NULL) {
+      break; // EOF
+    }
     input[strlen(input) - 1] = '\0';
-    // Parse user input
     char *args = input;
     // Build arg linked list
-    arg *head = NULL;
-    arg *current = NULL;
-    char *ptr = args;
-    while (*ptr != '\0') {
-      // Skip any leading spaces
-      while (*ptr == ' ') {
-        ptr++;
-      }
-      if (*ptr == '\0') {
-        break;
-      }
-      // Allocate a new arg node
-      arg *new_arg = malloc(sizeof(arg));
-      if (new_arg == NULL) {
-        printf("Failed to allocate memory for new_arg\n");
-        free_args(head);
-        exit(1);
-      }
-      new_arg->next = NULL;
-      char buffer[1024];
-      int len = 0;
-      int in_quotes = 0;
-      int in_double_quotes = 0;
-      // Collect the argument characters
-      while (*ptr != '\0' && (*ptr != ' ' || in_double_quotes || in_quotes)) {
-        if (*ptr == '"' && !in_double_quotes && !in_quotes) {
-          in_double_quotes = 1;
-          ptr++; // Skip the opening quote
-        } else if (*ptr == '\'' && !in_quotes && !in_double_quotes) {
-          in_quotes = 1;
-          ptr++; // Skip the opening quote
-        } else if (*ptr == '"' && in_double_quotes) {
-          in_double_quotes = 0;
-          ptr++; // Skip the closing quote
-        } else if (*ptr == '\'' && in_quotes) {
-          in_quotes = 0;
-          ptr++; // Skip the closing quote
-        } else if (*ptr == '\\' && in_double_quotes) {
-          ptr++; // Skip the escape character
-          if (*ptr == '\0') {
-            break;
-          }
-          if (*ptr == '\\' || *ptr == '"' || *ptr == '$' || *ptr == '\n') {
-            buffer[len++] = *ptr++;
-          } else {
-            buffer[len++] = '\\';
-            buffer[len++] = *ptr++;
-          }
-        } else if (*ptr == '\\' && (!in_double_quotes && !in_quotes)) {
-          ptr++; // Skip the escape character
-          if (*ptr == '\0') {
-            break;
-          }
-          buffer[len++] = *ptr++;
-        } else {
-          buffer[len++] = *ptr++;
-        }
-      }
-      buffer[len] = '\0';
-      // Assign the argument string
-      new_arg->argstr = strdup(buffer);
-      new_arg->is_quote = in_quotes || in_double_quotes;
-      in_double_quotes = 0;
-      
-      if (new_arg->argstr == NULL) {
-        printf("Failed to allocate memory for argstr\n");
-        free_args(head);
-        exit(1);
-      }
-      // Add the new arg to the linked list
-      if (head == NULL) {
-        head = new_arg;
-        current = new_arg;
-      } else {
-        current->next = new_arg;
-        current = new_arg;
-      }
-    }
+    arg *head = build_arg(NULL);
+    build_args(args, head);
+    arg *current = head;
     // BUILTIN COMMANDS
     if (strcmp(head->argstr, "exit") == 0) {
+      free_args(head);
       exit(0);
     } else if (strcmp(head->argstr, "cd") == 0) {
       if (head->next == NULL) {
@@ -152,7 +174,7 @@ int main() {
         char *home = getenv("HOME");
         char *new_arg = malloc(strlen(home) + strlen(head->argstr) + 1);
         if (new_arg == NULL) {
-          printf("Failed to allocate memory for new_arg\n");
+          fprintf(stderr, "Failed to allocate memory for new_arg\n");
           free_args(head);
           exit(1);
         }
@@ -183,6 +205,11 @@ int main() {
         printf("Failed to get current working directory\n");
       }
     } else if (strcmp(head->argstr, "type") == 0) {
+      if (head->next == NULL) {
+        printf("type: too few arguments\n");
+        free_args(head);
+        continue;
+      }
       char *curarg = head->next->argstr;
       char *command = find_command(curarg);
       if (strcmp(curarg, "cd") == 0) {
@@ -214,13 +241,7 @@ int main() {
             argc++;
             current = current->next;
           }
-          char **argv = malloc((argc + 2) * sizeof(char *));
-          if (argv == NULL) {
-            printf("Failed to allocate memory for argv\n");
-            free(command);
-            free_args(head);
-            exit(1);
-          }
+          char *argv[argc + 2];
           argv[0] = command;
           current = head->next;
           int i = 1;
@@ -230,25 +251,30 @@ int main() {
           }
           argv[i] = NULL;
           execv(command, argv);
-          printf("Failed to execute %s\n", command);
-          free(command);
+          fprintf(stderr, "Failed to execute %s\n", command);
           free_args(head);
-          exit(1);
-        } else {
+          free(command);
+          exit(2);
+        } else if (pid > 0){
           int status;
           waitpid(pid, &status, 0);
           free(command);
+        } else {
+          // fork fails
+          fprintf(stderr, "Failed to fork\n");
           free_args(head);
-      }
+          free(command);
+          exit(3);
+        }
       } else {
         printf("%s: command not found\n", input);
-        free_args(head);
       }
     } else {
       // Should never reach this point
-      printf("error: unknown error\n");
-      exit(1);
+      fprintf(stderr, "error: unknown error\n");
+      exit(99);
     }
+    free_args(head);
   }
   return 0;
 }
