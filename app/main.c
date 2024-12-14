@@ -481,8 +481,18 @@ void execute_command(command *command_head) {
 }
 
 int main() {
+  char *user = getenv("USER");
+  if (user == NULL) {
+    perror("Failed to get user\n");
+    exit(1);
+  }
+  char host[100];
+  if (gethostname(host, sizeof(host)) != 0) {
+    perror("Failed to get hostname\n");
+    exit(1);
+  }
   while (1) {
-    printf("$ ");
+    printf("%s@%s$ ", user, host);
     fflush(stdout);
     // Wait for user input
     char input[1024];
