@@ -146,14 +146,20 @@ char *parse_string(char *args, arg *current) {
         break;
       }
       buffer[len++] = *args++;
-    } else if ((*args == '|' || *args == '<' || *args == '>') && !in_double_quotes && !in_quotes) {
+    } else if (*args == '|' && !in_double_quotes && !in_quotes) {
+      break;
+    } else if (*args == '<' && !in_double_quotes && !in_quotes) {
+      break;
+    } else if (*args == '>' && !in_double_quotes && !in_quotes) {
       break;
     } else {
       buffer[len++] = *args++;
     }
   }
   buffer[len] = '\0';
-  current->is_quote = in_quotes || in_double_quotes;
+  if (current != NULL) {
+    current->is_quote = in_quotes || in_double_quotes;
+  }
   return strdup(buffer);
 }
 
@@ -162,12 +168,15 @@ int build_args(char *args, arg *head) {
   while (*args == ' ') { // Skip whitespace
     args++;
   }
-  int i = 1;
   while (*args != '\0') {
     // leave loop if special character is found
-    if (*args == '|' || *args == '<' || *args == '>') {
-      return i;
-    } 
+    if (*args == '|') {
+      return 1;
+    } if (*args == '<') {
+      return 2;
+    } if (*args == '>') {
+      return 3;
+    }
     // Assign the argument string
     current->argstr = parse_string(args, current);
     if (current->argstr == NULL) {
@@ -184,7 +193,6 @@ int build_args(char *args, arg *head) {
       current->next = build_arg(head);
       current = current->next;
     }
-    i++;
   }
   return 0;
 }
@@ -263,6 +271,12 @@ void echo(arg *head) {
 
 int get_fd_in(char *args) {
   int fd = 0;
+  while (*args != '<') { // Skip to <
+    args++;
+  }
+  if (*args == '\0') {
+    return -1;
+  }
   args++;
   while (*args == ' ') { // Skip whitespace
     args++;
@@ -292,6 +306,12 @@ int get_fd_in(char *args) {
 
 int get_fd_out(char *args) {
   int fd = 0;
+  while (*args != '>') { // Skip to >
+    args++;
+  }
+  if (*args == '\0') {
+    return -1;
+  }
   args++;
   while (*args == ' ') { // Skip whitespace
     args++;
@@ -314,6 +334,56 @@ int get_fd_out(char *args) {
   return fd;
 }
 
+void execute_command(command *command_head) {
+  // Fork and exec external command
+  char *task = find_command(command_head->name);
+  if (task != NULL) {
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+      int argc = 0;
+      arg *current = command_head->args;
+      while (current != NULL) {
+        argc++;
+        current = current->next;
+      }
+      char *argv[argc + 2];
+      argv[0] = task;
+      current = command_head->args;
+      int i = 1;
+      while (current != NULL) {
+        argv[i++] = current->argstr;
+        current = current->next;
+      }
+      argv[i] = NULL;
+      if (command_head->fd_in != STDOUT_FILENO) { // Redirect input
+        dup2(command_head->fd_in, STDIN_FILENO);
+        close(command_head->fd_in);
+      }
+      if (command_head->fd_out != STDOUT_FILENO) { // Redirect output
+        dup2(command_head->fd_out, STDOUT_FILENO);
+        close(command_head->fd_out);
+      }
+      execv(task, argv);
+      fprintf(stderr, "Failed to execute %s\n", task);
+      free_commands(command_head);
+      free(task);
+      exit(2);
+    } else if (pid > 0){ // Parent process
+      int status;
+      waitpid(pid, &status, 0);
+      free(task);
+    } else {
+      // fork fails
+      fprintf(stderr, "Failed to fork\n");
+      free_commands(command_head);
+      free(task);
+      exit(3);
+    }
+  } else {
+    printf("%s: command not found\n", command_head->name);
+  }
+}
+
 int main() {
   while (1) {
     printf("$ ");
@@ -330,14 +400,7 @@ int main() {
     command *current_command = command_head;
     int i = build_args(args, current_command->args);
     while (i != 0) {
-      printf("i: %d\n", i);
-      if (i == 1) {
-        printf("input may not start with a pipe or redirection\n");
-        break;
-      } else if (i == 2 && args[0] == '>') {
-        printf("input may not start with a redirection\n");
-        break;
-      } else if (args[0] == '|') { // pipe
+      if (i == 1) { // pipe
         current_command->name = current_command->args->argstr;
         arg *temp = current_command->args;
         current_command->args = current_command->args->next;
@@ -347,32 +410,14 @@ int main() {
         current_command = current_command->next;
         args++;
         i = build_args(args, current_command->args);
-      } else if (args[0] == '<') { // input redirection
-        current_command->name = current_command->args->argstr;
-        arg *temp = current_command->args;
-        current_command->args = current_command->args->next;
-        free(temp->argstr);
-        free(temp);
+      } else if (i == 2) { // input redirection
         current_command->fd_in = get_fd_in(args);
-        if (current_command->fd_in == -1) {
-          break;
-        }
-        current_command->next = build_command(command_head);
-        current_command = current_command->next;
-        i = build_args(args, current_command->args);
-      } else if (args[0] == '>') { // output redirection
-        current_command->name = current_command->args->argstr;
-        arg *temp = current_command->args;
-        current_command->args = current_command->args->next;
-        free(temp->argstr);
-        free(temp);
+        i = 0;
+      } else { // output redirection
+        printf("output redirection\n");
         current_command->fd_out = get_fd_out(args);
-        if (current_command->fd_out == -1) {
-          break;
-        }
-        current_command->next = build_command(command_head);
-        current_command = current_command->next;
-        i = build_args(args, current_command->args);
+        printf("fd_out: %d\n", current_command->fd_out);
+        i = 0;
       }
     }
     if (i == 0) {
@@ -398,46 +443,8 @@ int main() {
       type(command_head->args);
     }
     // EXTERNAL COMMANDS
-    else if (input[0] != '\0') {
-      // Fork and exec external command
-      char *task = find_command(command_head->name);
-      if (task != NULL) {
-        pid_t pid = fork();
-        if (pid == 0) {
-          int argc = 0;
-          arg *current = command_head->args;
-          while (current != NULL) {
-            argc++;
-            current = current->next;
-          }
-          char *argv[argc + 2];
-          argv[0] = task;
-          current = command_head->args;
-          int i = 1;
-          while (current != NULL) {
-            argv[i++] = current->argstr;
-            current = current->next;
-          }
-          argv[i] = NULL;
-          execv(task, argv);
-          fprintf(stderr, "Failed to execute %s\n", task);
-          free_commands(command_head);
-          free(task);
-          exit(2);
-        } else if (pid > 0){
-          int status;
-          waitpid(pid, &status, 0);
-          free(task);
-        } else {
-          // fork fails
-          fprintf(stderr, "Failed to fork\n");
-          free_commands(command_head);
-          free(task);
-          exit(3);
-        }
-      } else {
-        printf("%s: command not found\n", input);
-      }
+    else if (command_head->name != NULL) {
+      execute_command(command_head);
     } else {
       // Should never reach this point
       fprintf(stderr, "error: unknown error\n");
