@@ -45,7 +45,7 @@ void free_commands(command *head) {
 arg *build_arg(arg *head) {
   arg *new_arg = malloc(sizeof(arg));
   if (new_arg == NULL) {
-    fprintf(stderr, "Failed to allocate memory for new_arg\n");
+    perror("Failed to allocate memory for new_arg\n");
     free_args(head);
     exit(1);
   }
@@ -58,7 +58,7 @@ arg *build_arg(arg *head) {
 command *build_command(command *head) {
   command *new_command = malloc(sizeof(command));
   if (new_command == NULL) {
-    fprintf(stderr, "Failed to allocate memory for new_command\n");
+    perror("Failed to allocate memory for new_command\n");
     free_commands(head);
     exit(1);
   }
@@ -85,14 +85,14 @@ char *find_command(char *command) {
   char *path = getenv("PATH");
   char *path_copy = strdup(path);
   if (path_copy == NULL) {
-    fprintf(stderr, "Failed to allocate memory for path_copy\n");
+    perror("Failed to allocate memory for path_copy\n");
     return NULL;
   }
   char *dir = strtok(path_copy, ":");
   while (dir != NULL) {
     char *full_path = malloc(strlen(dir) + strlen(command) + 2);
     if (full_path == NULL) {
-      fprintf(stderr, "Failed to allocate memory for full_path\n");
+      perror("Failed to allocate memory for full_path\n");
       free(path_copy);
       return NULL;
     }    
@@ -180,7 +180,7 @@ int build_args(char *args, arg *head) {
     // Assign the argument string
     current->argstr = parse_string(args, current);
     if (current->argstr == NULL) {
-      fprintf(stderr, "Failed to allocate memory for argstr\n");
+      perror("Failed to allocate memory for argstr\n");
       free_args(head);
       exit(1);
     }
@@ -233,7 +233,7 @@ void change_directory(arg *head) {
     char *home = getenv("HOME");
     char *new_arg = malloc(strlen(home) + strlen(head->argstr) + 1);
     if (new_arg == NULL) {
-      fprintf(stderr, "Failed to allocate memory for new_arg\n");
+      perror("Failed to allocate memory for new_arg\n");
       free_args(head);
       exit(1);
     }
@@ -286,7 +286,7 @@ int get_fd_in(char *args) {
   }
   char *file_name = parse_string(args, NULL);
   if (file_name == NULL) {
-    fprintf(stderr, "Failed to allocate memory for file_name\n");
+    perror("Failed to allocate memory for file_name\n");
     exit(1);
   }
   if (access(file_name, F_OK) != 0) {
@@ -321,7 +321,7 @@ int get_fd_out(char *args) {
   }
   char *file_name = parse_string(args, NULL);
   if (file_name == NULL) {
-    fprintf(stderr, "Failed to allocate memory for file_name\n");
+    perror("Failed to allocate memory for file_name\n");
     exit(1);
   }
   fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -334,54 +334,150 @@ int get_fd_out(char *args) {
   return fd;
 }
 
-void execute_command(command *command_head) {
-  // Fork and exec external command
-  char *task = find_command(command_head->name);
-  if (task != NULL) {
-    pid_t pid = fork();
-    if (pid == 0) { // Child process
-      int argc = 0;
-      arg *current = command_head->args;
-      while (current != NULL) {
-        argc++;
-        current = current->next;
+void build_commands(char *args, command *command_head) {
+  command *current_command = command_head;
+  int i = build_args(args, current_command->args);
+  while (i != 0) {
+    switch (i) {
+      case 1: // pipe
+        current_command->name = strdup(current_command->args->argstr);
+        if (current_command->name == NULL) {
+          perror("Failed to allocate memory for current_command->name\n");
+          free_commands(command_head);
+          exit(1);
+        }
+        if (current_command->args->next->argstr) {
+          arg *temp = current_command->args;
+          current_command->args = current_command->args->next;
+          free(temp->argstr);
+          free(temp);
+          arg *curr = current_command->args;
+          arg *prev = NULL;
+          while (curr) {
+            if (curr->argstr) {
+              prev = curr;
+              curr = curr->next;
+            } else {
+              free(curr);
+              if (prev) {
+                prev->next = NULL;
+              }
+              break;
+            }
+          }
+        } else {
+          free_args(current_command->args);
+          current_command->args = NULL;
+        }
+        current_command->next = build_command(command_head);
+        current_command = current_command->next;
+        while (*args != '|') { // Skip to |
+          args++;
+        }
+        if (*args == '|') {
+          args++;
+        }
+        while (*args == ' ') { // Skip whitespace
+          args++;
+        }
+        i = build_args(args, current_command->args);
+        break;
+      case 2: // input redirection
+        current_command->fd_in = get_fd_in(args);
+        if (current_command->fd_in < 0) {
+          perror("Failed to get file descriptor for input redirection\n");
+          return;
+        }
+        i = 0;
+        break;
+      case 3: // output redirection
+        current_command->fd_out = get_fd_out(args);
+        if (current_command->fd_out < 0) {
+          perror("Failed to get file descriptor for output redirection\n");
+          return;
+        }
+        i = 0;
+        break;
+      default:
+        perror("error: invalid argument return value\n");
+        return;
+    }
+  }
+  current_command->name = strdup(current_command->args->argstr);
+  if (current_command->name == NULL) {
+    perror("Failed to allocate memory for current_command->name\n");
+    free_commands(command_head);
+    exit(1);
+  }
+  if (current_command->args->next) {
+    arg *temp = current_command->args;
+    current_command->args = current_command->args->next;
+    free(temp->argstr);
+    free(temp);
+    arg *curr = current_command->args;
+    arg *prev = NULL;
+    while (curr) {
+      if (curr->argstr) {
+        prev = curr;
+        curr = curr->next;
+      } else {
+        free(curr->argstr);
+        free(curr);
+        if (prev) {
+          prev->next = NULL;
+        }
+        break;
       }
-      char *argv[argc + 2];
-      argv[0] = task;
-      current = command_head->args;
-      int i = 1;
-      while (current != NULL) {
-        argv[i++] = current->argstr;
-        current = current->next;
-      }
-      argv[i] = NULL;
-      if (command_head->fd_in != STDOUT_FILENO) { // Redirect input
-        dup2(command_head->fd_in, STDIN_FILENO);
-        close(command_head->fd_in);
-      }
-      if (command_head->fd_out != STDOUT_FILENO) { // Redirect output
-        dup2(command_head->fd_out, STDOUT_FILENO);
-        close(command_head->fd_out);
-      }
-      execv(task, argv);
-      fprintf(stderr, "Failed to execute %s\n", task);
-      free_commands(command_head);
-      free(task);
-      exit(2);
-    } else if (pid > 0){ // Parent process
-      int status;
-      waitpid(pid, &status, 0);
-      free(task);
-    } else {
-      // fork fails
-      fprintf(stderr, "Failed to fork\n");
-      free_commands(command_head);
-      free(task);
-      exit(3);
     }
   } else {
-    printf("%s: command not found\n", command_head->name);
+    free(current_command->args->argstr);
+    free(current_command->args);
+    current_command->args = NULL;
   }
+}
+
+
+void redirect_io(command *command) {
+  if (command->fd_in != STDIN_FILENO) {
+    dup2(command->fd_in, STDIN_FILENO);
+    close(command->fd_in);
+  }
+  if (command->fd_out != STDOUT_FILENO) {
+    dup2(command->fd_out, STDOUT_FILENO);
+    close(command->fd_out);
+  }
+}
+
+void execute_command(command *command_head) {
+  redirect_io(command_head);
+  if (strcmp(command_head->name, "echo") == 0) {
+    echo(command_head->args);
+    exit(0);
+  } else if (strcmp(command_head->name, "pwd") == 0) {
+    pwd();
+    exit(0);
+  } else if (strcmp(command_head->name, "type") == 0) {
+    type(command_head->args);
+    exit(0);
+  }
+  int argc = 0;
+  arg *current = command_head->args;
+  while (current != NULL) {
+    argc++;
+    current = current->next;
+  }
+  char *argv[argc + 2];
+  argv[0] = command_head->name;
+  current = command_head->args;
+  int i = 1;
+  while (current != NULL) {
+    argv[i++] = current->argstr;
+    current = current->next;
+  }
+  argv[i] = NULL;
+  execvp(command_head->name, argv);
+  printf("Failed to execute %s\n", command_head->name);
+  exit(1);
 }
 
 int main() {
@@ -397,35 +493,14 @@ int main() {
     char *args = input;
     // Build command linked list
     command *command_head = build_command(NULL);
-    command *current_command = command_head;
-    int i = build_args(args, current_command->args);
-    while (i != 0) {
-      if (i == 1) { // pipe
-        current_command->name = current_command->args->argstr;
-        arg *temp = current_command->args;
-        current_command->args = current_command->args->next;
-        free(temp->argstr);
-        free(temp);
-        current_command->next = build_command(command_head);
-        current_command = current_command->next;
-        args++;
-        i = build_args(args, current_command->args);
-      } else if (i == 2) { // input redirection
-        current_command->fd_in = get_fd_in(args);
-        i = 0;
-      } else { // output redirection
-        printf("output redirection\n");
-        current_command->fd_out = get_fd_out(args);
-        printf("fd_out: %d\n", current_command->fd_out);
-        i = 0;
-      }
+    build_commands(args, command_head);
+    int num_commands = 0;
+    command *current = command_head;
+    while (current != NULL) {
+      num_commands++;
+      current = current->next;
     }
-    if (i == 0) {
-      current_command->name = current_command->args->argstr;
-      arg *temp = current_command->args;
-      current_command->args = current_command->args->next;
-      free(temp);
-    } else {
+    if (num_commands == 0) {
       free_commands(command_head);
       continue;
     }
@@ -435,22 +510,61 @@ int main() {
       exit(0);
     } else if (strcmp(command_head->name, "cd") == 0) {
       change_directory(command_head->args);
-    } else if (strcmp(command_head->name, "echo") == 0) {
-      echo(command_head->args);
-    } else if (strcmp(command_head->name, "pwd") == 0) {
-      pwd();
-    } else if (strcmp(command_head->name, "type") == 0) {
-      type(command_head->args);
     }
-    // EXTERNAL COMMANDS
+    // OTHER COMMANDS
     else if (command_head->name != NULL) {
-      execute_command(command_head);
+      int num_pipes = num_commands - 1;
+      int pipefds[num_pipes * 2];
+      for (int i = 0; i < num_pipes; i++) {
+        if (pipe(pipefds + i * 2) < 0) {
+          perror("Failed to create pipe\n");
+          free_commands(command_head);
+          exit(1);
+        }
+      }
+      int process_count = 0;
+      command *current = command_head;
+      while (current != NULL) {
+        pid_t pid = fork();
+        if (pid == 0) { // child
+          if (process_count != 0) { // if not first
+            if (dup2(pipefds[(process_count - 1) * 2], STDIN_FILENO) < 0) {
+              perror("Failed to duplicate file descriptor\n");
+              exit(1);
+            }
+          }
+          if (current->next != NULL) { // if not last
+            if (dup2(pipefds[process_count * 2 + 1], STDOUT_FILENO) < 0) {
+              perror("Failed to duplicate file descriptor\n");
+              exit(1);
+            }
+          }
+          for (int i = 0; i < num_pipes * 2; i++) {
+            close(pipefds[i]);
+          }
+          execute_command(current);
+          exit(1);
+        } else if (pid < 0) { // fork failed
+          perror("Failed to fork\n");
+          free_commands(command_head);
+          exit(1);
+        }
+        // parent
+        current = current->next;
+        process_count++;
+      }
+      for (int i = 0; i < num_pipes * 2; i++) {
+        close(pipefds[i]);
+      }
+      for (int i = 0; i < num_commands; i++) {
+        wait(NULL);
+      }
     } else {
       // Should never reach this point
-      fprintf(stderr, "error: unknown error\n");
+      perror("error: unknown error\n");
       exit(99);
     }
-    free_commands(command_head);
+  free_commands(command_head);
   }
   return 0;
 }
