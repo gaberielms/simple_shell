@@ -1,3 +1,4 @@
+.vscode
 valgrind.sh
 valgrind_output.txt
 shell_executable
