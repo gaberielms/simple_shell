@@ -177,7 +177,6 @@ int build_args(char *args, arg *head) {
     } if (*args == '>') {
       return 3;
     }
-    // Assign the argument string
     current->argstr = parse_string(args, current);
     if (current->argstr == NULL) {
       perror("Failed to allocate memory for argstr\n");
@@ -306,6 +305,7 @@ int get_fd_in(char *args) {
 
 int get_fd_out(char *args) {
   int fd = 0;
+  int append = 0; // 0 = truncate, 1 = append
   while (*args != '>') { // Skip to >
     args++;
   }
@@ -313,6 +313,10 @@ int get_fd_out(char *args) {
     return -1;
   }
   args++;
+  if (*args == '>') {
+    append = 1;
+    args++;
+  }
   while (*args == ' ') { // Skip whitespace
     args++;
   }
@@ -324,7 +328,13 @@ int get_fd_out(char *args) {
     perror("Failed to allocate memory for file_name\n");
     exit(1);
   }
-  fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  int flags = O_WRONLY | O_CREAT;
+  if (append) {
+    flags |= O_APPEND;
+  } else {
+    flags |= O_TRUNC;
+  }
+  fd = open(file_name, flags, 0644);
   if (fd == -1) {
     printf("Failed to open %s\n", file_name);
     free(file_name);
@@ -383,19 +393,11 @@ void build_commands(char *args, command *command_head) {
         i = build_args(args, current_command->args);
         break;
       case 2: // input redirection
-        current_command->fd_in = get_fd_in(args);
-        if (current_command->fd_in < 0) {
-          perror("Failed to get file descriptor for input redirection\n");
-          return;
-        }
+        current_command->fd_in = get_fd_in(args); // error checking in get_fd_in
         i = 0;
         break;
       case 3: // output redirection
-        current_command->fd_out = get_fd_out(args);
-        if (current_command->fd_out < 0) {
-          perror("Failed to get file descriptor for output redirection\n");
-          return;
-        }
+        current_command->fd_out = get_fd_out(args); // error checking in get_fd_out
         i = 0;
         break;
       default:
@@ -425,6 +427,8 @@ void build_commands(char *args, command *command_head) {
         free(curr);
         if (prev) {
           prev->next = NULL;
+        } else {
+          current_command->args = NULL;
         }
         break;
       }
