@@ -70,17 +70,6 @@ command *build_command(command *head) {
   return new_command;
 }
 
-void print_args(arg *head) {
-  arg *current = head;
-  int i = 0;
-  printf("[\n");
-  while (current != NULL) {
-    printf("  %d: %s\n", i++, current->argstr);
-    current = current->next;
-  }
-  printf("]\n");
-}
-
 char *find_command(char *command) {
   char *path = getenv("PATH");
   char *path_copy = strdup(path);
@@ -439,7 +428,6 @@ void build_commands(char *args, command *command_head) {
     current_command->args = NULL;
   }
 }
-
 
 void redirect_io(command *command) {
   if (command->fd_in != STDIN_FILENO) {
