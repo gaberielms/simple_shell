@@ -82,22 +82,23 @@ char *parse_string(char *args, arg *current) {
   return strdup(buffer);
 }
 
-int get_fd_in(char *args) {
+int get_fd_in(char **args) {
+  char *ptr = *args;
   int fd = 0;
-  while (*args != '<') { // Skip to <
-    args++;
+  while (*ptr != '<') { // Skip to <
+    ptr++;
   }
-  if (*args == '\0') {
+  if (*ptr == '\0') {
     return -1;
   }
-  args++;
-  while (*args == ' ') { // Skip whitespace
-    args++;
+  ptr++;
+  while (*ptr == ' ') { // Skip whitespace
+    ptr++;
   }
-  if (*args == '\0') {
+  if (*ptr == '\0') {
     return -1;
   }
-  char *file_name = parse_string(args, NULL);
+  char *file_name = parse_string(ptr, NULL);
   if (file_name == NULL) {
     perror("Failed to allocate memory for file_name\n");
     exit(1);
@@ -113,7 +114,9 @@ int get_fd_in(char *args) {
     free(file_name);
     return -1;
   }
+  ptr += strlen(file_name);
   free(file_name);
+  *args = ptr;
   return fd;
 }
 

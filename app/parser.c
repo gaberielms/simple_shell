@@ -131,8 +131,15 @@ void build_commands(char *args, command *command_head) {
         i = build_args(args, current_command->args);
         break;
       case 2: // input redirection
-        current_command->fd_in = get_fd_in(args); // error checking in get_fd_in
-        i = 0;
+        current_command->fd_in = get_fd_in(&args); // error checking in get_fd_in
+        if (*args == '\0') {
+          i = 0;
+          break;
+        }
+        while (*args == ' ') { // Skip whitespace
+          args++;
+        }
+        i = build_args(args, current_command->args);
         break;
       case 3: // output redirection
         current_command->fd_out = get_fd_out(args); // error checking in get_fd_out
