@@ -1,2 +1,3 @@
-# A Simple Implementation of a Shell in C
+# A Unix Shell in C
 # supports piping and redirection
+More features on the way
