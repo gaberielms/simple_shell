@@ -1,3 +1,3 @@
 # A Unix Shell in C
-supports piping and redirection\n
-More features on the way
+-supports piping and redirection
+-More features on the way
