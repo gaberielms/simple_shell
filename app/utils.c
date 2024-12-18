@@ -108,7 +108,7 @@ int get_fd_in(char **args) {
     free(file_name);
     return -1;
   }
-  fd = open(file_name, O_RDONLY);
+  fd = open(file_name, O_RDONLY | O_NONBLOCK);
   if (fd == -1) {
     printf("Failed to open %s\n", file_name);
     free(file_name);
