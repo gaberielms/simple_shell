@@ -30,7 +30,7 @@ char *find_command(char *command) {
 }
 
 char *parse_string(char *args, arg *current) {
-  char buffer[1024];
+  char buffer[MAX_INPUT_SIZE];
   int len = 0;
   int in_quotes = 0;
   int in_double_quotes = 0;

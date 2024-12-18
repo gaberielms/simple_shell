@@ -6,7 +6,7 @@ int main() {
     perror("Failed to get user\n");
     exit(1);
   }
-  char host[100];
+  char host[MAX_USERNAME_SIZE];
   if (gethostname(host, sizeof(host)) != 0) {
     perror("Failed to get hostname\n");
     exit(1);
@@ -15,8 +15,8 @@ int main() {
     printf("%s@%s$ ", user, host);
     fflush(stdout);
     // Wait for user input
-    char input[1024];
-    if (fgets(input, 1024, stdin) == NULL) {
+    char input[MAX_INPUT_SIZE];
+    if (fgets(input, MAX_INPUT_SIZE, stdin) == NULL) {
       break; // EOF
     }
     input[strlen(input) - 1] = '\0';

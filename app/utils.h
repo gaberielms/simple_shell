@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#define MAX_INPUT_SIZE 1024 // Maximum input size
+
 #include "types.h"
 
 char *find_command(char *command); // Find a command in PATH
