@@ -22,6 +22,9 @@ void execute_command(command *command_head) {
   } else if (strcmp(command_head->name, "type") == 0) {
     type(command_head->args);
     exit(0);
+  } else if (find_command(command_head->name) == NULL) {
+    printf("Command not found: %s\n", command_head->name);
+    exit(0);
   }
   int argc = 0;
   arg *current = command_head->args;
