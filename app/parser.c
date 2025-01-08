@@ -30,7 +30,7 @@ arg *build_arg(arg *head) {
   }
   new_arg->argstr = NULL;
   new_arg->next = NULL;
-  new_arg->is_quote = 0;
+  new_arg->is_quote = 0; 
   return new_arg;
 }
 
@@ -43,6 +43,7 @@ command *build_command(command *head) {
   }
   new_command->name = NULL;
   new_command->args = build_arg(NULL);
+  new_command->currfd = 0;
   new_command->fd_in = 0;
   new_command->fd_out = 1;
   new_command->next = NULL;
@@ -58,18 +59,17 @@ int build_args(char *args, arg *head) {
     // leave loop if special character is found
     if (*args == '|') {
       return 1;
-    } if (*args == '<') {
+    } else if (*args == '<') {
       return 2;
-    } if (*args == '>') {
+    } else if (*args == '>') {
       return 3;
     }
-    current->argstr = parse_string(args, current);
+    current->argstr = parse_string(&args, current);
     if (current->argstr == NULL) {
       perror("Failed to allocate memory for argstr\n");
       free_args(head);
       exit(1);
     }
-    args += strlen(current->argstr);
     while (*args == ' ') { // Skip whitespace
       args++;
     }
@@ -155,6 +155,17 @@ void build_commands(char *args, command *command_head) {
     perror("Failed to allocate memory for current_command->name\n");
     free_commands(command_head);
     exit(1);
+  }
+  arg *temp = current_command->args;
+  while (temp != NULL && temp->next != NULL) {
+    if (temp->next->argstr != NULL && temp->next->argstr[0] == '\0') {
+      free(temp->next->argstr);
+      arg *to_free = temp->next;
+      temp->next = temp->next->next;
+      free(to_free);
+      break;
+    }
+    temp = temp->next;
   }
   if (current_command->args->next) {
     arg *temp = current_command->args;

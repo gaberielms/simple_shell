@@ -4,10 +4,11 @@
 #define MAX_INPUT_SIZE 1024 // Maximum input size
 
 #include "types.h"
+#include <ctype.h>
 
 char *find_command(char *command); // Find a command in PATH
 
-char *parse_string(char *args, arg *current); // Parse string return heap allocated string
+char *parse_string(char **args, arg *current); // Parse string return heap allocated string
 
 int get_fd_in(char **args); // Get input file descriptor
 

@@ -19,6 +19,7 @@ typedef struct arg {
 typedef struct command {
   char *name;
   arg *args;
+  int currfd;
   int fd_in;
   int fd_out;
   struct command *next;

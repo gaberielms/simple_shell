@@ -29,56 +29,61 @@ char *find_command(char *command) {
   return NULL;
 }
 
-char *parse_string(char *args, arg *current) {
+char *parse_string(char **args, arg *current) {
   char buffer[MAX_INPUT_SIZE];
   int len = 0;
   int in_quotes = 0;
   int in_double_quotes = 0;
+  char *ptr = *args;
   // Collect the argument characters
-  while (*args != '\0' && (*args != ' ' || in_double_quotes || in_quotes)) {
-    if (*args == '"' && !in_double_quotes && !in_quotes) {
+  while (*ptr != '\0' && (*ptr != ' ' || in_double_quotes || in_quotes)) {
+    if (*ptr == '"' && !in_double_quotes && !in_quotes) {
       in_double_quotes = 1;
-      args++;
-    } else if (*args == '\'' && !in_quotes && !in_double_quotes) {
+      ptr++;
+    } else if (*ptr == '\'' && !in_quotes && !in_double_quotes) {
       in_quotes = 1;
-      args++;
-    } else if (*args == '"' && in_double_quotes) {
+      ptr++;
+    } else if (*ptr == '"' && in_double_quotes) {
       in_double_quotes = 0;
-      args++;
-    } else if (*args == '\'' && in_quotes) {
+      ptr++;
+    } else if (*ptr == '\'' && in_quotes) {
       in_quotes = 0;
-      args++;
-    } else if (*args == '\\' && in_double_quotes) {
-      args++;
-      if (*args == '\0') {
+      ptr++;
+    } else if (*ptr == '\\' && in_double_quotes) {
+      ptr++;
+      if (*ptr == '\0') {
         break;
       }
-      if (*args == '\\' || *args == '"' || *args == '$' || *args == '\n') {
-        buffer[len++] = *args++;
+      if (*ptr == '\\' || *ptr == '"' || *ptr == '$' || *ptr == '\n') {
+        buffer[len++] = *ptr++;
       } else {
         buffer[len++] = '\\';
-        buffer[len++] = *args++;
+        buffer[len++] = *ptr++;
       }
-    } else if (*args == '\\' && (!in_double_quotes && !in_quotes)) {
-      args++;
-      if (*args == '\0') {
+    } else if (*ptr == '\\' && (!in_double_quotes && !in_quotes)) {
+      ptr++;
+      if (*ptr == '\0') {
         break;
       }
-      buffer[len++] = *args++;
-    } else if (*args == '|' && !in_double_quotes && !in_quotes) {
+      buffer[len++] = *ptr++;
+    } else if (*ptr == '|' && !in_double_quotes && !in_quotes) {
       break;
-    } else if (*args == '<' && !in_double_quotes && !in_quotes) {
+    } else if (*ptr == '<' && !in_double_quotes && !in_quotes) {
       break;
-    } else if (*args == '>' && !in_double_quotes && !in_quotes) {
+    } else if (*ptr == '>' && !in_double_quotes && !in_quotes) {
+      if (*(ptr - 1) != ' ' && isdigit(*(ptr - 1))) {
+        buffer[len--] = '\0';
+      }
       break;
     } else {
-      buffer[len++] = *args++;
+      buffer[len++] = *ptr++;
     }
   }
   buffer[len] = '\0';
   if (current != NULL) {
     current->is_quote = in_quotes || in_double_quotes;
   }
+  *args = ptr; // Update the original args pointer
   return strdup(buffer);
 }
 
@@ -98,7 +103,7 @@ int get_fd_in(char **args) {
   if (*ptr == '\0') {
     return -1;
   }
-  char *file_name = parse_string(ptr, NULL);
+  char *file_name = parse_string(&ptr, NULL);
   if (file_name == NULL) {
     perror("Failed to allocate memory for file_name\n");
     exit(1);
@@ -140,7 +145,7 @@ int get_fd_out(char *args) {
   if (*args == '\0') {
     return -1;
   }
-  char *file_name = parse_string(args, NULL);
+  char *file_name = parse_string(&args, NULL);
   if (file_name == NULL) {
     perror("Failed to allocate memory for file_name\n");
     exit(1);
@@ -153,7 +158,7 @@ int get_fd_out(char *args) {
   }
   fd = open(file_name, flags, 0644);
   if (fd == -1) {
-    printf("Failed to open %s\n", file_name);
+    printf("Failed to open %s\n", file_name);  
     free(file_name);
     return -1;
   }

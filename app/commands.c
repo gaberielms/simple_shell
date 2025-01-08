@@ -31,8 +31,7 @@ void change_directory(arg *head) {
     if (chdir(home) != 0) {
       printf("cd: %s: No such file or directory\n", home);
     }
-  }
-  else if (strchr(head->argstr, '~') != NULL) {
+  } else if (strchr(head->argstr, '~') != NULL) {
     char *home = getenv("HOME");
     char *new_arg = malloc(strlen(home) + strlen(head->argstr) + 1);
     if (new_arg == NULL) {
@@ -47,7 +46,7 @@ void change_directory(arg *head) {
     }
     free(new_arg);
   } else if (chdir(head->argstr) != 0) {
-    printf("cd: %s: No such file or directory\n", head->next->argstr);
+    printf("cd: %s: No such file or directory\n", head->argstr);
   }
 }
 
