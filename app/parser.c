@@ -46,11 +46,12 @@ command *build_command(command *head) {
   new_command->currfd = 0;
   new_command->fd_in = 0;
   new_command->fd_out = 1;
+  new_command->stderr_out = 0;
   new_command->next = NULL;
   return new_command;
 }
 
-int build_args(char *args, arg *head) {
+int build_args(char *args, arg *head, command *command_head) {
   arg *current = head;
   while (*args == ' ') { // Skip whitespace
     args++;
@@ -64,7 +65,7 @@ int build_args(char *args, arg *head) {
     } else if (*args == '>') {
       return 3;
     }
-    current->argstr = parse_string(&args, current);
+    current->argstr = parse_string(&args, current, command_head);
     if (current->argstr == NULL) {
       perror("Failed to allocate memory for argstr\n");
       free_args(head);
@@ -79,12 +80,24 @@ int build_args(char *args, arg *head) {
       current = current->next;
     }
   }
+  current = head;
+  while (current->next != NULL) {
+    if (current->argstr[0] == '\0') {
+      arg *temp = current;
+      current = current->next;
+      free(temp->argstr);
+      free(temp);
+      head = current;
+    } else {
+      current = current->next;
+    }
+  }
   return 0;
 }
 
 void build_commands(char *args, command *command_head) {
   command *current_command = command_head;
-  int i = build_args(args, current_command->args);
+  int i = build_args(args, current_command->args, current_command);
   while (i != 0) {
     switch (i) {
       case 1: // pipe
@@ -128,7 +141,7 @@ void build_commands(char *args, command *command_head) {
         while (*args == ' ') { // Skip whitespace
           args++;
         }
-        i = build_args(args, current_command->args);
+        i = build_args(args, current_command->args, current_command);
         break;
       case 2: // input redirection
         current_command->fd_in = get_fd_in(&args); // error checking in get_fd_in
@@ -139,7 +152,7 @@ void build_commands(char *args, command *command_head) {
         while (*args == ' ') { // Skip whitespace
           args++;
         }
-        i = build_args(args, current_command->args);
+        i = build_args(args, current_command->args, current_command);
         break;
       case 3: // output redirection
         current_command->fd_out = get_fd_out(args); // error checking in get_fd_out

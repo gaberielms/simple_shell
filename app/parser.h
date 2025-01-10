@@ -12,7 +12,7 @@ arg *build_arg(arg *head); // Build arg struct
 
 command *build_command(command *head); // Build command struct
 
-int build_args(char *args, arg *head); // Build args linked list
+int build_args(char *args, arg *head, command *command_head); // Build args linked list
 
 void build_commands(char *args, command *command_head); // Build commands linked list
 

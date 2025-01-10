@@ -22,6 +22,7 @@ typedef struct command {
   int currfd;
   int fd_in;
   int fd_out;
+  int stderr_out;
   struct command *next;
 } command;
 

@@ -1,13 +1,17 @@
 #include "executor.h"
 
 void redirect_io(command *command) {
+  if (command->stderr_out) {
+    dup2(command->fd_out, STDERR_FILENO);
+    close(command->fd_out);
+  }
+  else if (command->fd_out != STDOUT_FILENO) {
+    dup2(command->fd_out, STDOUT_FILENO);
+    close(command->fd_out);
+  }
   if (command->fd_in != STDIN_FILENO) {
     dup2(command->fd_in, STDIN_FILENO);
     close(command->fd_in);
-  }
-  if (command->fd_out != STDOUT_FILENO) {
-    dup2(command->fd_out, STDOUT_FILENO);
-    close(command->fd_out);
   }
 }
 
@@ -23,7 +27,7 @@ void execute_command(command *command_head) {
     type(command_head->args);
     exit(0);
   } else if (find_command(command_head->name) == NULL) {
-    printf("Command not found: %s\n", command_head->name);
+    fprintf(stderr, "%s: command not found\n", command_head->name);
     exit(0);
   }
   int argc = 0;
@@ -42,6 +46,6 @@ void execute_command(command *command_head) {
   }
   argv[i] = NULL;
   execvp(command_head->name, argv);
-  printf("Failed to execute %s\n", command_head->name);
+  fprintf(stderr, "Failed to execute %s\n", command_head->name);
   exit(1);
 }

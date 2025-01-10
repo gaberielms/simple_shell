@@ -29,7 +29,7 @@ char *find_command(char *command) {
   return NULL;
 }
 
-char *parse_string(char **args, arg *current) {
+char *parse_string(char **args, arg *current, command *command_head) {
   char buffer[MAX_INPUT_SIZE];
   int len = 0;
   int in_quotes = 0;
@@ -73,6 +73,9 @@ char *parse_string(char **args, arg *current) {
     } else if (*ptr == '>' && !in_double_quotes && !in_quotes) {
       if (*(ptr - 1) != ' ' && isdigit(*(ptr - 1))) {
         buffer[len--] = '\0';
+        if (*(ptr - 1) - '0' == 2) {
+          command_head->stderr_out = 1;
+        }
       }
       break;
     } else {
@@ -103,7 +106,7 @@ int get_fd_in(char **args) {
   if (*ptr == '\0') {
     return -1;
   }
-  char *file_name = parse_string(&ptr, NULL);
+  char *file_name = parse_string(&ptr, NULL, NULL);
   if (file_name == NULL) {
     perror("Failed to allocate memory for file_name\n");
     exit(1);
@@ -145,7 +148,7 @@ int get_fd_out(char *args) {
   if (*args == '\0') {
     return -1;
   }
-  char *file_name = parse_string(&args, NULL);
+  char *file_name = parse_string(&args, NULL, NULL);
   if (file_name == NULL) {
     perror("Failed to allocate memory for file_name\n");
     exit(1);
@@ -158,7 +161,7 @@ int get_fd_out(char *args) {
   }
   fd = open(file_name, flags, 0644);
   if (fd == -1) {
-    printf("Failed to open %s\n", file_name);  
+    printf("Failed to open %s\n", file_name);
     free(file_name);
     return -1;
   }
