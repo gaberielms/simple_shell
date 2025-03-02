@@ -13,6 +13,8 @@
 #include "executor.h"
 #include "utils.h"
 
+struct termios orig_term; // Original terminal settings
+
 void disable_raw_mode(); // Disable raw mode
 
 void enable_raw_mode(); // Enable raw mode

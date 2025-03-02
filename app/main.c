@@ -1,7 +1,5 @@
 #include "main.h"
 
-struct termios orig_term;
-
 char* history[MAX_HISTORY];
 int history_count = 0;
 int history_index = 0;
@@ -9,7 +7,6 @@ int history_index = 0;
 void disable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_term);
 }
-
 
 void enable_raw_mode() {
     tcgetattr(STDIN_FILENO, &orig_term);
@@ -138,6 +135,7 @@ int main() {
       }
       free_commands(command_head);
 
+      enable_raw_mode();
       cmd_len = 0;
       memset(cmd, 0, sizeof(cmd));
       printf("%s@%s$ ", user, host);
@@ -188,6 +186,16 @@ int main() {
             cmd_len--;
             write(STDOUT_FILENO, "\b", 1);
           }
+        }
+      }
+    } else if (c == 9) { // tab key
+      char *matches[] = {"cd", "pwd", "echo", "type", "exit"};
+      for (int i = 0; i<5; i++) {
+        if (strncmp(matches[i], cmd, cmd_len) == 0) {
+          write(STDOUT_FILENO, matches[i] + cmd_len, strlen(matches[i]) - cmd_len);
+          cmd_len = strlen(matches[i]);
+          strcpy(cmd, matches[i]);
+          break;
         }
       }
     } else {
