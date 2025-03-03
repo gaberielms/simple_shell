@@ -5,31 +5,38 @@ int history_count = 0;
 int history_index = 0;
 
 void disable_raw_mode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_term);
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_term);
 }
 
 void enable_raw_mode() {
-    tcgetattr(STDIN_FILENO, &orig_term);
-    atexit(disable_raw_mode);
-    struct termios raw = orig_term;
-    raw.c_lflag &= ~(ECHO | ICANON);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+  tcgetattr(STDIN_FILENO, &orig_term);
+  atexit(disable_raw_mode);
+  struct termios raw = orig_term;
+  raw.c_lflag &= ~(ECHO | ICANON);
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+void free_history() {
+  for (int i = 0; i < history_count; i++) {
+    free(history[i]);
+  }
 }
 
 void add_history(const char *cmd) {
-    if (history_count < MAX_HISTORY) {
-        history[history_count++] = strdup(cmd);
-    } else {
-        free(history[0]);
-        for (int i = 1; i < MAX_HISTORY; i++) {
-            history[i - 1] = history[i];
-        }
-        history[MAX_HISTORY - 1] = strdup(cmd);
+  if (history_count < MAX_HISTORY) {
+    history[history_count++] = strdup(cmd);
+  } else {
+    free(history[0]);
+    for (int i = 1; i < MAX_HISTORY; i++) {
+      history[i - 1] = history[i];
     }
-    history_index = history_count; // reset navigation index
+    history[MAX_HISTORY - 1] = strdup(cmd);
+  }
+  history_index = history_count; // reset navigation index
 }
 
 int main() {
+  atexit(free_history);
   char *user = getenv("USER");
   if (user == NULL) {
     perror("Failed to get user\n");
